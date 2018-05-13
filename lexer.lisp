@@ -1,9 +1,12 @@
 (defun lexify (file classifier)
-  "Given CLASSIFIER, classify each token in FILE, producing a token list."
+  "Given CLASSIFIER, classify each token in FILE, producing a token list.
+   CLASSIFIER should return uninterned symbols."
   (with-open-file (stream file)
     (loop for sub = (read-token stream)
           until (string= "" sub)
-          collect (funcall classifier sub))))
+          collect (let ((sym (funcall classifier sub)))
+                    (setf (symbol-value sym) sub)
+                    sym))))
 
 (defmacro do-stream ((var stream) (test &optional (result nil result-supplied-p)) &body body)
   "Concise way to iterate over STREAM. Iterates over each character; stops when eof is found or

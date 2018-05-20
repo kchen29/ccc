@@ -79,3 +79,22 @@
 (defun parse-symbol (symbol)
   (protect
    (eq symbol (pop token-list))))
+
+((s (and a x b))
+ (x (or (and c d)
+        c)))
+
+(defun parse-acb (tokens)
+  (setf token-list tokens)
+  (and (parse-symbol 'a) (parse-x) (parse-symbol 'b)))
+
+(defun parse-x ()
+  (por (pand (parse-symbol 'c) (parse-symbol 'd))
+       (parse-symbol 'c)))
+
+((s (and (or e a) b)))
+
+(defun parse-b (tokens)
+  (setf token-list tokens)
+  (pand (por t (parse-symbol 'a))
+        (parse-symbol 'b)))

@@ -1,4 +1,5 @@
 (defvar token-list)
+;;branches is a list of lists of token-lists and branches
 (defvar branches)
 (defvar branch)
 (defvar grammar)
@@ -11,6 +12,7 @@
    BRANCH represents the things to be checked against the token-list.
    GRAMMAR is an alist of the definitions of the nonterminals.
    PARSE-BRANCH parses first form. Evaluates and removes it."
+  (format t "tl: ~a~%branch: ~a~%" token-list branch)
   (cond
     ((assoc (car branch) grammar)
      (setf (car branch) (copy-tree (cadr (assoc (car branch) grammar))))
@@ -31,38 +33,51 @@
                (progn (pop branch)
                       nil)))))
     ((eq 'or (caar branch))
-     (if (null (cdar branch))
-         (pop branch)
-         (if (let ((hold token-list))
-               (let ((temp (cadar branch)))
-                 (setf (cdar branch) (cddar branch)
-                       branch (cons temp branch)))
-               (if (parse-branch)
-                   t
-                   (progn (setf token-list hold)
-                          nil)))
-             (progn (push (copy-tree branch) branches)
-                    (pop branches))
-             (parse-branch))))
+     (cond
+       ((null (cdar branch)) (pop branch))
+       ((let ((hold token-list))
+          (let ((temp (cadar branch)))
+            (setf (cdar branch) (cddar branch)
+                  branch (cons temp branch)))
+          (if (parse-branch)
+              (progn (when (cdar branch)
+                       (push (list hold (copy-tree branch)) branches))
+                     (pop branch))
+              (progn (setf token-list hold)
+                     nil))))
+       (t (parse-branch))))
     (t (error "Unknown branch: ~a" branch))))
 
 
 (defun test-branches ()
-  (do (done)
-      ((or (null branches) done) done)
-    (format t "~a~%" branches)
-    (let ((branch (pop branches)))
-      (setf done (and (parse-branch)
-                      (null token-list))))))
+  (do ()
+      ((null branches))
+    (format t "branches: ~a~%" branches)
+    (let* ((part (pop branches))
+           (token-list (car part))
+           (branch (cadr part)))
+      (when (and (parse-branch)
+                 (null token-list))
+        (return-from test-branches t)))))
 
 ;;classic
-
+#|
 ((s (or (and a s b)
         empty)))
+|#
 
 (defun parse-ab (tokens)
-  (let ((token-list tokens)
-        (grammar '((s (or (and a s b)
+  (let ((grammar '((s (or (and a s b)
                        e))))
-        (branches '((s))))
+        (branches (list (list tokens (list 's)))))
+    (test-branches)))
+
+;;backtrack
+#|
+((s (and (or e a) b)))
+|#
+
+(defun parse-backtrack (tokens)
+  (let ((grammar '((s (and (or e a) b))))
+        (branches (list (list tokens (list 's)))))
     (test-branches)))

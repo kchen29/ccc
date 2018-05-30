@@ -1,100 +1,79 @@
-(defun parse (token-list grammar)
-  "Parses TOKEN-LIST with GRAMMAR. Returns a syntax tree."
-  )
+(defvar token-list '() "Represents the sentence to be checked.")
+(defvar branches '() "A list of lists of token-lists and branches.")
+(defvar whole-branch '() "The entire current branch.")
+(defvar grammar '() "An alist of the definitions of the nonterminals.")
 
-(defvar token-list)
+(defun parse-symbol (sym)
+  (eq sym (pop token-list)))
 
-(defmacro protect (test)
-  (let ((hold (gensym))
-        (res (gensym)))
-    `(let ((,hold token-list)
-           (,res ,test))
-       (unless ,res
-         (setf token-list ,hold))
-       ,res)))
+;;all ORs branch apart
+(defun parse-branch (branch)
+  "Completely parses BRANCH with GRAMMAR.
+   BRANCH represents the things to be checked against TOKEN-LIST."
+  (format t "tl: ~a~%branch: ~a~%" token-list whole-branch)
+  (cond 
+    ((assoc (car branch) grammar)
+     (let ((expand (copy-tree (cadr (assoc (car branch) grammar)))))
+       (setf (car branch) (car expand)
+             (cdr branch) (cdr expand)))
+     (parse-branch branch))
+    ((eq 'e (car branch)))
+    ((eq 'and (car branch))
+     (if (null (cdr branch))
+         t
+         (when (parse-branch (cadr branch))
+           (setf (cdr branch) (cddr branch))
+           (parse-branch branch))))
+    ((eq 'or (car branch))
+     (let ((test (pop (cdr branch))))
+       (when (cdr branch)
+         (push (list token-list (copy-tree whole-branch)) branches))
+       (setf (car branch) (car test)
+             (cdr branch) (cdr test)))
+     (parse-branch branch))
+    (t (parse-symbol (car branch)))))
 
-(defmacro por (&rest rest)
-  `(protect (or ,@rest)))
+(defun parse-branches ()
+  "Given an initial BRANCHES, parses through all the branches
+   and returns t if TOKEN-LIST is a correct sentence following GRAMMAR."
+  (do ()
+      ((null branches))
+    (format t "branches: ~a~%" branches)
+    (let* ((part (pop branches))
+           (token-list (car part))
+           (whole-branch (cadr part)))
+      (when (and (parse-branch whole-branch)
+                 (null token-list))
+        (return t)))))
 
-(defmacro pand (&rest rest)
-  `(protect (and ,@rest)))
+;;preprocess grammar: terminals and nonterminals should have parens around them
 
+'(a b)
+(s)
+(or (and a s b)
+    e)
+(and a s b)
+(and s b)
+(and (or (and a s b)
+         e)
+     b)
+(and (and a s b)
+     b)
+nil
 
-((goal assignment)
- (assignment (and lhs "=" rhs ";"))
- (lhs identifier)
- (rhs (or (identifier)
-          (number))))
-
-(defun parse-assign (tokens)
-  (setf token-list tokens)
-  (parse-goal))
-
-(defun parse-goal ()
-  (protect
-   (parse-assignment)))
-
-(defun parse-assignment ()
-  (pand
-   (parse-lhs)
-   (parse-string "=")
-   (parse-rhs)
-   (parse-string ";")))
-
-(defun parse-lhs ()
-  (parse-identifier))
-
-(defun parse-rhs ()
-  (por (parse-identifier)
-       (parse-number)))
-
-(defun parse-identifier ()
-  (protect
-   (alpha-char-p (char (pop token-list) 0))))
-
-(defun parse-number ()
-  (protect
-   (digit-char-p (char (pop token-list) 0))))
-
-(defun parse-string (string)
-  (protect
-   (string= string (pop token-list))))
-
-
-((s (or (and a s b)
-        empty)))
+(and (or e)
+     b)
+(and e b)
+(and b)
+t
 
 (defun parse-ab (tokens)
-  (setf token-list tokens)
-  (and (parse-s)
-       (null token-list)))
+  (let ((grammar '((s (or (and (a) (s) (b))
+                       (e)))))
+        (branches (list (list tokens (list 's)))))
+    (parse-branches)))
 
-(defun parse-s ()
-  (por (pand
-        (parse-symbol 'a)
-        (parse-s)
-        (parse-symbol 'b))
-       t))
-
-(defun parse-symbol (symbol)
-  (protect
-   (eq symbol (pop token-list))))
-
-((s (and a x b))
- (x (or (and c d)
-        c)))
-
-(defun parse-acb (tokens)
-  (setf token-list tokens)
-  (and (parse-symbol 'a) (parse-x) (parse-symbol 'b)))
-
-(defun parse-x ()
-  (por (pand (parse-symbol 'c) (parse-symbol 'd))
-       (parse-symbol 'c)))
-
-((s (and (or e a) b)))
-
-(defun parse-b (tokens)
-  (setf token-list tokens)
-  (pand (por t (parse-symbol 'a))
-        (parse-symbol 'b)))
+(defun parse-backtrack (tokens)
+  (let ((grammar '((s (and (or (e) (a)) (b)))))
+        (branches (list (list tokens (list 's)))))
+    (parse-branches)))

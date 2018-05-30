@@ -19,14 +19,20 @@
      (parse-branch branch))
     ((eq 'e (car branch)))
     ((eq 'and (car branch))
-     (if (null (cdr branch))
-         t
-         (when (parse-branch (cadr branch))
-           (setf (cdr branch) (cddr branch))
-           (parse-branch branch))))
+     (cond
+       ((null (cdr branch)))
+       ((parse-branch (cadr branch))
+        (if (cdddr branch)
+            (setf (cdr branch) (cddr branch))
+            (setf (car branch) (caaddr branch)
+                  (cdr branch) (cdaddr branch)))
+        (parse-branch branch))))
     ((eq 'or (car branch))
      (let ((test (pop (cdr branch))))
        (when (cdr branch)
+         (unless (cddr branch)
+           (setf (car branch) (caadr branch)
+                 (cdr branch) (cdadr branch)))
          (push (list token-list (copy-tree whole-branch)) branches))
        (setf (car branch) (car test)
              (cdr branch) (cdr test)))
@@ -47,7 +53,7 @@
         (return t)))))
 
 ;;preprocess grammar: terminals and nonterminals should have parens around them
-
+#|
 '(a b)
 (s)
 (or (and a s b)
@@ -66,7 +72,7 @@ nil
 (and e b)
 (and b)
 t
-
+|#
 (defun parse-ab (tokens)
   (let ((grammar '((s (or (and (a) (s) (b))
                        (e)))))
